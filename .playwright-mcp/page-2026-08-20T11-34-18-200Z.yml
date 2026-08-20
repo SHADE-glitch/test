@@ -1,0 +1,25 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link "🧠 AI 面试陪练" [ref=e6] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=e7]:
+        - generic [ref=e20]: 👤 Bob
+        - button "退出" [ref=e21]
+  - main [ref=e10]:
+    - generic [ref=e22]:
+      - heading "AI 面试陪练 & 智能反馈平台" [level=1] [ref=e23]
+      - paragraph [ref=e24]: 选择方向，AI 面试官连续追问，最后生成能力报告
+      - generic [ref=e25]:
+        - heading "选择面试主题" [level=2] [ref=e26]
+        - generic [ref=e27]:
+          - button "Java" [ref=e28]
+          - button "Redis" [ref=e29]
+          - button "MySQL" [ref=e30]
+          - button "JVM" [ref=e31]
+          - button "并发" [ref=e32]
+        - generic [ref=e33]:
+          - button "初级" [ref=e34]
+          - button "中级" [ref=e35]
+          - button "高级" [ref=e36]
+        - button "开始面试" [ref=e37]
