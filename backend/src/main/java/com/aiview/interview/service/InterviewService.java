@@ -9,14 +9,18 @@ import com.aiview.agent.ai.ToolCall;
 import com.aiview.common.BizException;
 import com.aiview.common.ResultCode;
 import com.aiview.config.AiProperties;
+import com.aiview.config.RabbitConfig;
 import com.aiview.interview.dto.CreateInterviewRequest;
+import com.aiview.interview.dto.InterviewResultVO;
 import com.aiview.interview.dto.InterviewSessionVO;
 import com.aiview.interview.dto.MessageVO;
 import com.aiview.interview.dto.TopicVO;
 import com.aiview.interview.entity.InterviewMessage;
+import com.aiview.interview.entity.InterviewResult;
 import com.aiview.interview.entity.InterviewSession;
 import com.aiview.interview.entity.KnowledgePoint;
 import com.aiview.interview.mapper.InterviewMessageMapper;
+import com.aiview.interview.mapper.InterviewResultMapper;
 import com.aiview.interview.mapper.InterviewSessionMapper;
 import com.aiview.interview.mapper.KnowledgePointMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -27,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -46,12 +51,14 @@ public class InterviewService {
 
     private final InterviewSessionMapper sessionMapper;
     private final InterviewMessageMapper messageMapper;
+    private final InterviewResultMapper resultMapper;
     private final KnowledgePointMapper knowledgePointMapper;
     private final ChatClient chatClient;
     private final AiProperties aiProperties;
     private final RedissonClient redissonClient;
     private final InterviewStateStore stateStore;
     private final ObjectMapper objectMapper;
+    private final RabbitTemplate rabbitTemplate;
 
     private static final long LOCK_WAIT_SECONDS = 5;
 
@@ -216,6 +223,30 @@ public class InterviewService {
         return toVO(session, messages, session.getCurrentQuestionId());
     }
 
+    public InterviewResultVO result(Long userId, Long sessionId) {
+        requireOwnedSession(userId, sessionId);
+        InterviewResult row = resultMapper.selectOne(
+                new LambdaQueryWrapper<InterviewResult>()
+                        .eq(InterviewResult::getSessionId, sessionId));
+        if (row == null) {
+            return null;
+        }
+        try {
+            Map<String, InterviewResultVO.DimensionVO> dims = new LinkedHashMap<>();
+            JsonNode root = objectMapper.readTree(row.getDimensions());
+            root.fields().forEachRemaining(e -> dims.put(e.getKey(), e.getValue().isNumber()
+                    ? new InterviewResultVO.DimensionVO(e.getValue().asInt(), "")
+                    : objectMapper.convertValue(e.getValue(), InterviewResultVO.DimensionVO.class)));
+            List<String> weak = new ArrayList<>();
+            objectMapper.readTree(row.getWeakPoints()).forEach(n -> weak.add(n.asText()));
+            List<String> suggestions = new ArrayList<>();
+            objectMapper.readTree(row.getSuggestions()).forEach(n -> suggestions.add(n.asText()));
+            return new InterviewResultVO(sessionId, dims, row.getTotalScore(), weak, suggestions, row.getCreatedAt());
+        } catch (Exception e) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, "评分结果解析失败");
+        }
+    }
+
     private List<ChatMessage> decisionMessages(InterviewSession session, List<ChatMessage> history) {
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(ChatMessage.system(buildSystemPrompt(session.getTopic(), session.getLevel())));
@@ -325,6 +356,13 @@ public class InterviewService {
         sessionMapper.updateById(session);
         stateStore.write(session.getId(), new InterviewStateStore.SessionState(
                 InterviewStatus.FINISHED.name(), session.getQuestionCount(), msg.getId()));
+        try {
+            rabbitTemplate.convertAndSend(RabbitConfig.SCORING_EXCHANGE, RabbitConfig.SCORING_ROUTING_KEY,
+                    new InterviewScoringService.ScoringMessage(session.getId()));
+            log.info("已投递评分任务 session={}", session.getId());
+        } catch (Exception e) {
+            log.error("评分任务投递失败 session={}", session.getId(), e);
+        }
     }
 
     private RLock lockFor(Long sessionId) {
@@ -414,8 +452,7 @@ public class InterviewService {
                 .toList();
     }
 
-    private InterviewMessage saveAiMessage(Long sessionId, String kind, String content, Long kpId) {
-        InterviewMessage msg = new InterviewMessage();
+    private InterviewMessage saveAiMessage(Long sessionId, String kind, String content, Long kpId) {        InterviewMessage msg = new InterviewMessage();
         msg.setSessionId(sessionId);
         msg.setRole("AI");
         msg.setKind(kind);

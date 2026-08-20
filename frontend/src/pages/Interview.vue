@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
-import { getInterview, streamAnswer, type MessageVO } from '../api/interview'
+import { getInterview, getInterviewResult, streamAnswer, type MessageVO } from '../api/interview'
 import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
@@ -28,6 +28,20 @@ const levelLabel = computed(() => {
   const map: Record<string, string> = { JUNIOR: '初级', INTERMEDIATE: '中级', SENIOR: '高级' }
   return session.value ? (map[session.value.level] ?? session.value.level) : ''
 })
+
+const { data: result } = useQuery({
+  queryKey: ['interviewResult', sessionId],
+  queryFn: () => getInterviewResult(sessionId.value),
+  enabled: isFinished,
+  refetchInterval: 5000,
+})
+
+const dimensionMeta: Record<string, { label: string; color: string }> = {
+  knowledge: { label: '知识掌握', color: 'bg-blue-500' },
+  expression: { label: '表达清晰', color: 'bg-emerald-500' },
+  source: { label: '实践来源', color: 'bg-amber-500' },
+  analysis: { label: '问题分析', color: 'bg-purple-500' },
+}
 
 watch(messages, async () => {
   await new Promise((r) => setTimeout(r, 0))
@@ -85,6 +99,54 @@ async function submit() {
       <div v-if="isLoading" class="py-10 text-center text-slate-400">加载面试中...</div>
 
       <template v-else>
+        <div
+          v-if="isFinished"
+          class="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm"
+        >
+          <p class="mb-4 font-semibold text-emerald-700">能力报告</p>
+          <div v-if="!result" class="py-6 text-center text-sm text-slate-400">
+            正在生成能力报告，AI 评分中...
+          </div>
+          <template v-else>
+            <div class="mb-5 flex items-center justify-center gap-6">
+              <div class="text-center">
+                <p class="text-3xl font-bold text-emerald-600">{{ result.totalScore }}</p>
+                <p class="text-xs text-slate-400">总分 / 40</p>
+              </div>
+              <div class="flex-1 space-y-2">
+                <div v-for="(meta, key) in dimensionMeta" :key="key">
+                  <div class="mb-1 flex justify-between text-xs">
+                    <span>{{ meta.label }}</span>
+                    <span class="text-slate-500">{{ result.dimensions[key]?.score ?? 0 }} / 10</span>
+                  </div>
+                  <div class="h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      class="h-full rounded-full transition-all duration-500"
+                      :class="meta.color"
+                      :style="{ width: `${(result.dimensions[key]?.score ?? 0) * 10}%` }"
+                    />
+                  </div>
+                  <p class="mt-0.5 text-xs text-slate-400">{{ result.dimensions[key]?.comment }}</p>
+                </div>
+              </div>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="rounded-xl bg-red-50 p-4">
+                <p class="mb-2 text-sm font-semibold text-red-600">薄弱点</p>
+                <ul class="list-inside list-disc space-y-1 text-sm text-red-700">
+                  <li v-for="(w, i) in result.weakPoints" :key="i">{{ w }}</li>
+                </ul>
+              </div>
+              <div class="rounded-xl bg-blue-50 p-4">
+                <p class="mb-2 text-sm font-semibold text-blue-600">提升建议</p>
+                <ul class="list-inside list-disc space-y-1 text-sm text-blue-700">
+                  <li v-for="(s, i) in result.suggestions" :key="i">{{ s }}</li>
+                </ul>
+              </div>
+            </div>
+          </template>
+        </div>
+
         <div
           v-for="m in messages"
           :key="m.id"

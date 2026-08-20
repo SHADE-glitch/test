@@ -5,6 +5,7 @@ import com.aiview.common.Result;
 import com.aiview.common.ResultCode;
 import com.aiview.common.UserContext;
 import com.aiview.interview.dto.CreateInterviewRequest;
+import com.aiview.interview.dto.InterviewResultVO;
 import com.aiview.interview.dto.InterviewSessionVO;
 import com.aiview.interview.dto.MessageVO;
 import com.aiview.interview.dto.TopicVO;
@@ -48,6 +49,11 @@ public class InterviewController {
     @GetMapping("/interviews/{id}")
     public Result<InterviewSessionVO> detail(@PathVariable Long id) {
         return Result.ok(interviewService.detail(UserContext.currentUserId(), id));
+    }
+
+    @GetMapping("/interviews/{id}/result")
+    public Result<InterviewResultVO> result(@PathVariable Long id) {
+        return Result.ok(interviewService.result(UserContext.currentUserId(), id));
     }
 
     @PostMapping("/interviews/{id}/answer")

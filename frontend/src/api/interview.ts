@@ -39,6 +39,23 @@ export const listInterviews = () => request<InterviewSessionVO[]>('/interviews')
 
 export const getInterview = (id: number | string) => request<InterviewSessionVO>(`/interviews/${id}`)
 
+export interface DimensionVO {
+  score: number
+  comment: string
+}
+
+export interface InterviewResultVO {
+  sessionId: number
+  dimensions: Record<string, DimensionVO>
+  totalScore: number
+  weakPoints: string[]
+  suggestions: string[]
+  createdAt: string
+}
+
+export const getInterviewResult = (id: number | string) =>
+  request<InterviewResultVO | null>(`/interviews/${id}/result`)
+
 export const answerInterview = (id: number | string, content: string) =>
   request<MessageVO>(`/interviews/${id}/answer`, {
     method: 'POST',
