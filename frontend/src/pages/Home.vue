@@ -58,9 +58,14 @@ async function start() {
     <div class="mx-auto mt-10 max-w-3xl rounded-xl bg-white p-6 shadow-sm">
       <div class="mb-2 flex items-center justify-between">
         <h2 class="font-semibold">选择面试主题</h2>
-        <button class="text-sm text-slate-400 hover:text-slate-600" @click="auth.logout()">
-          退出登录
-        </button>
+        <div class="flex items-center gap-3">
+          <button class="text-sm text-blue-600 hover:text-blue-800" @click="router.push('/knowledge')">
+            知识图谱
+          </button>
+          <button class="text-sm text-slate-400 hover:text-slate-600" @click="auth.logout()">
+            退出登录
+          </button>
+        </div>
       </div>
 
       <div v-if="isLoading" class="py-8 text-center text-slate-400">加载主题中...</div>
