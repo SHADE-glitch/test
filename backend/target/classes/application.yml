@@ -1,0 +1,58 @@
+spring:
+  application:
+    name: aiview-backend
+  threads:
+    virtual:
+      enabled: true
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+      data-locations: classpath:db/data.sql
+      encoding: utf-8
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    banner: false
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-secret-key-please-change-in-production-env}
+    access-expire-seconds: 7200
+    refresh-expire-seconds: 604800
+  ai:
+    active: ${AI_PROVIDER:deepseek}
+    providers:
+      deepseek:
+        base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+        api-key: ${DEEPSEEK_API_KEY:}
+        chat-model: ${DEEPSEEK_CHAT_MODEL:deepseek-chat}
+        embedding-model: ""
+      openai:
+        base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+        api-key: ${OPENAI_API_KEY:}
+        chat-model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
+        embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+      ollama:
+        base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+        api-key: ""
+        chat-model: ${OLLAMA_CHAT_MODEL:qwen2.5:7b}
+        embedding-model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+
+logging:
+  level:
+    com.aiview: debug

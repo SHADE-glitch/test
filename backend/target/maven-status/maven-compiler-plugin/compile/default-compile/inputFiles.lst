@@ -1,0 +1,10 @@
+/home/shade/Public/test/backend/src/main/java/com/aiview/AiviewApplication.java
+/home/shade/Public/test/backend/src/main/java/com/aiview/common/BizException.java
+/home/shade/Public/test/backend/src/main/java/com/aiview/common/GlobalExceptionHandler.java
+/home/shade/Public/test/backend/src/main/java/com/aiview/common/HealthController.java
+/home/shade/Public/test/backend/src/main/java/com/aiview/common/Result.java
+/home/shade/Public/test/backend/src/main/java/com/aiview/common/ResultCode.java
+/home/shade/Public/test/backend/src/main/java/com/aiview/config/AiProperties.java
+/home/shade/Public/test/backend/src/main/java/com/aiview/config/MybatisPlusConfig.java
+/home/shade/Public/test/backend/src/main/java/com/aiview/config/RedissonConfig.java
+/home/shade/Public/test/backend/src/main/java/com/aiview/config/SecurityConfig.java

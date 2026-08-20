@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+
+html,
+body {
+  @apply h-full bg-slate-50 text-slate-800;
+}
+
+#app {
+  @apply h-full;
+}
