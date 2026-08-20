@@ -22,12 +22,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 @Slf4j
 @Service
@@ -80,13 +83,7 @@ public class InterviewService {
     @Transactional
     public MessageVO answer(Long userId, Long sessionId, String answer) {
         InterviewSession session = requireOwnedSession(userId, sessionId);
-        if (InterviewStatus.FINISHED.name().equals(session.getStatus())) {
-            throw new BizException(ResultCode.INTERVIEW_FINISHED);
-        }
-        if (!InterviewStatus.ASKING.name().equals(session.getStatus())
-                && !InterviewStatus.START.name().equals(session.getStatus())) {
-            throw new BizException(ResultCode.INTERVIEW_STATE_ERROR, "当前状态不允许提交答案");
-        }
+        assertAsking(session);
 
         saveUserMessage(sessionId, "answer", answer);
 
@@ -100,6 +97,64 @@ public class InterviewService {
         sessionMapper.updateById(session);
 
         return toMessageVO(msg);
+    }
+
+    public SseEmitter answerStream(Long userId, Long sessionId, String answer) {
+        SseEmitter emitter = new SseEmitter(300_000L);
+        Thread.ofVirtual().start(() -> {
+            try {
+                InterviewSession session = requireOwnedSession(userId, sessionId);
+                assertAsking(session);
+
+                saveUserMessage(sessionId, "answer", answer);
+
+                List<ChatMessage> history = buildHistory(sessionId);
+                List<ChatMessage> messages = new ArrayList<>();
+                messages.add(ChatMessage.system(buildSystemPrompt(session.getTopic(), session.getLevel())));
+                messages.addAll(history);
+
+                String model = aiProperties.activeProvider().getChatModel();
+                StringBuilder acc = new StringBuilder();
+                Consumer<String> onToken = token -> {
+                    acc.append(token);
+                    try {
+                        emitter.send(SseEmitter.event().name("token").data(token));
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                };
+
+                chatClient.chatStream(ChatRequest.builder(model).messages(messages).temperature(0.7).build(), onToken);
+
+                String content = acc.toString().trim();
+                if (content.isEmpty()) {
+                    throw new BizException(ResultCode.AI_SERVICE_ERROR, "AI 未返回有效问题");
+                }
+
+                InterviewMessage msg = saveAiMessage(sessionId, "question", content, null);
+                session.setStatus(InterviewStatus.ASKING.name());
+                session.setCurrentQuestionId(msg.getId());
+                session.setQuestionCount(session.getQuestionCount() + 1);
+                sessionMapper.updateById(session);
+
+                emitter.send(SseEmitter.event().name("done").data(Map.of("messageId", msg.getId())));
+                emitter.complete();
+            } catch (Exception e) {
+                log.error("stream answer failed: {}", e.getMessage());
+                emitter.completeWithError(e);
+            }
+        });
+        return emitter;
+    }
+
+    private void assertAsking(InterviewSession session) {
+        if (InterviewStatus.FINISHED.name().equals(session.getStatus())) {
+            throw new BizException(ResultCode.INTERVIEW_FINISHED);
+        }
+        if (!InterviewStatus.ASKING.name().equals(session.getStatus())
+                && !InterviewStatus.START.name().equals(session.getStatus())) {
+            throw new BizException(ResultCode.INTERVIEW_STATE_ERROR, "当前状态不允许提交答案");
+        }
     }
 
     public List<InterviewSessionVO> listByUser(Long userId) {

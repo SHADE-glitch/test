@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
-import { createInterview, listTopics } from '../api/interview'
+import { createInterview, listTopics, type TopicVO } from '../api/interview'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
@@ -16,7 +16,7 @@ const levels = [
 
 const { data: topics, isLoading } = useQuery({
   queryKey: ['topics'],
-  queryFn: listTopics,
+  queryFn: (): Promise<TopicVO[]> => listTopics(),
 })
 
 const selectedTopic = ref<string>('')

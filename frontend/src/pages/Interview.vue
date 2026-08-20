@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
-import { answerInterview, getInterview } from '../api/interview'
+import { getInterview, streamAnswer, type MessageVO } from '../api/interview'
 import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
@@ -19,6 +19,7 @@ const { data: session, refetch, isLoading } = useQuery({
 const answer = ref('')
 const submitting = ref(false)
 const error = ref('')
+const streaming = ref('')
 const messagesEnd = ref<HTMLElement | null>(null)
 
 const messages = computed(() => session.value?.messages ?? [])
@@ -38,9 +39,18 @@ async function submit() {
   submitting.value = true
   error.value = ''
   answer.value = ''
+  streaming.value = ''
   try {
-    await answerInterview(sessionId.value, content)
-    await refetch()
+    await streamAnswer(sessionId.value, content, {
+      onToken: (token) => {
+        streaming.value += token
+        messagesEnd.value?.scrollIntoView({ behavior: 'smooth' })
+      },
+      onDone: async () => {
+        streaming.value = ''
+        await refetch()
+      },
+    })
   } catch (e) {
     answer.value = content
     error.value = e instanceof Error ? e.message : '提交失败，请重试'
@@ -92,9 +102,14 @@ async function submit() {
           </div>
         </div>
 
-        <div v-if="submitting" class="flex justify-start">
+        <div v-if="submitting && !streaming" class="flex justify-start">
           <div class="rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-4 py-3 text-sm text-slate-400">
             AI 思考中...
+          </div>
+        </div>
+        <div v-if="streaming" class="flex justify-start">
+          <div class="max-w-[75%] whitespace-pre-wrap rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed">
+            {{ streaming }}<span class="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-blue-500 align-middle" />
           </div>
         </div>
         <div ref="messagesEnd" />
