@@ -59,6 +59,9 @@ async function start() {
       <div class="mb-2 flex items-center justify-between">
         <h2 class="font-semibold">选择面试主题</h2>
         <div class="flex items-center gap-3">
+          <button class="text-sm text-blue-600 hover:text-blue-800" @click="router.push('/dashboard')">
+            数据分析
+          </button>
           <button class="text-sm text-blue-600 hover:text-blue-800" @click="router.push('/knowledge')">
             知识图谱
           </button>
