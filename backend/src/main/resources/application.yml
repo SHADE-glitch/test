@@ -52,6 +52,7 @@ app:
         api-key: ""
         chat-model: ${OLLAMA_CHAT_MODEL:qwen2.5:3b}
         embedding-model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+        tools-enabled: ${OLLAMA_TOOLS_ENABLED:false}
 
 logging:
   level:

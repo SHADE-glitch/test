@@ -23,6 +23,7 @@ const streaming = ref('')
 const messagesEnd = ref<HTMLElement | null>(null)
 
 const messages = computed(() => session.value?.messages ?? [])
+const isFinished = computed(() => session.value?.status === 'FINISHED')
 const levelLabel = computed(() => {
   const map: Record<string, string> = { JUNIOR: '初级', INTERMEDIATE: '中级', SENIOR: '高级' }
   return session.value ? (map[session.value.level] ?? session.value.level) : ''
@@ -95,9 +96,14 @@ async function submit() {
             :class="
               m.role === 'USER'
                 ? 'rounded-br-sm bg-blue-600 text-white'
-                : 'rounded-bl-sm border border-slate-200 bg-white'
+                : m.kind === 'feedback'
+                  ? 'rounded-bl-sm border border-emerald-200 bg-emerald-50'
+                  : 'rounded-bl-sm border border-slate-200 bg-white'
             "
           >
+            <p v-if="m.kind === 'feedback'" class="mb-1 text-xs font-semibold text-emerald-600">
+              面试总结
+            </p>
             {{ m.content }}
           </div>
         </div>
@@ -117,23 +123,37 @@ async function submit() {
     </div>
 
     <div class="rounded-b-xl border-t bg-white p-3">
-      <p v-if="error" class="mb-2 text-center text-sm text-red-500">{{ error }}</p>
-      <form class="flex gap-2" @submit.prevent="submit">
-        <input
-          v-model="answer"
-          type="text"
-          placeholder="输入你的回答，回车提交"
-          class="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400"
-          :disabled="submitting"
-        />
+      <div
+        v-if="isFinished"
+        class="flex items-center justify-between rounded-lg bg-emerald-50 px-4 py-3"
+      >
+        <p class="text-sm font-medium text-emerald-700">面试已结束，AI 已给出整体反馈</p>
         <button
-          type="submit"
-          class="rounded-lg bg-blue-600 px-6 py-2.5 text-sm text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="submitting || !answer.trim()"
+          class="rounded-lg bg-emerald-600 px-4 py-1.5 text-sm text-white transition hover:bg-emerald-700"
+          @click="router.push('/')"
         >
-          {{ submitting ? '等待中' : '发送' }}
+          返回首页
         </button>
-      </form>
+      </div>
+      <template v-else>
+        <p v-if="error" class="mb-2 text-center text-sm text-red-500">{{ error }}</p>
+        <form class="flex gap-2" @submit.prevent="submit">
+          <input
+            v-model="answer"
+            type="text"
+            placeholder="输入你的回答，回车提交"
+            class="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400"
+            :disabled="submitting"
+          />
+          <button
+            type="submit"
+            class="rounded-lg bg-blue-600 px-6 py-2.5 text-sm text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="submitting || !answer.trim()"
+          >
+            {{ submitting ? '等待中' : '发送' }}
+          </button>
+        </form>
+      </template>
     </div>
   </section>
 </template>

@@ -20,6 +20,8 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.function.Consumer;
 
 /**
@@ -77,6 +79,56 @@ public class OpenAiCompatibleChatClient implements ChatClient {
                 }
             }
         });
+    }
+
+    @Override
+    public void chatStreamTools(ChatRequest request, Consumer<String> onToken,
+                                Consumer<List<ToolCall>> onToolCalls) {
+        Map<Integer, ObjectNode> toolSlots = new TreeMap<>();
+        post(request, true, (body) -> {
+            JsonNode delta = body.path("choices").path(0).path("delta");
+            JsonNode content = delta.path("content");
+            if (content.isTextual()) {
+                String token = content.asText();
+                if (!token.isEmpty()) {
+                    onToken.accept(token);
+                }
+            }
+            JsonNode tcs = delta.path("tool_calls");
+            if (tcs.isArray()) {
+                for (JsonNode tc : tcs) {
+                    int idx = tc.path("index").asInt(0);
+                    ObjectNode slot = toolSlots.computeIfAbsent(idx, i -> objectMapper.createObjectNode());
+                    String id = tc.path("id").asText(null);
+                    if (id != null) {
+                        slot.put("id", id);
+                    }
+                    JsonNode fn = tc.path("function");
+                    String name = fn.path("name").asText(null);
+                    if (name != null) {
+                        slot.put("name", name);
+                    }
+                    String frag = fn.path("arguments").asText("");
+                    if (!frag.isEmpty()) {
+                        String prev = slot.path("arguments").asText("");
+                        slot.put("arguments", prev + frag);
+                    }
+                }
+            }
+        });
+
+        if (toolSlots.isEmpty()) {
+            onToolCalls.accept(List.of());
+            return;
+        }
+        List<ToolCall> calls = new ArrayList<>();
+        for (ObjectNode slot : toolSlots.values()) {
+            calls.add(new ToolCall(
+                    slot.path("id").asText(""),
+                    slot.path("name").asText(""),
+                    slot.path("arguments").asText("{}")));
+        }
+        onToolCalls.accept(calls);
     }
 
     private JsonNode post(ChatRequest request, boolean stream, Consumer<JsonNode> onChunk) {

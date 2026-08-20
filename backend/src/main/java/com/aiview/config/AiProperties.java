@@ -30,5 +30,7 @@ public class AiProperties {
         private String apiKey = "";
         private String chatModel;
         private String embeddingModel = "";
+        /** 是否启用 tool calling（部分本地模型不支持或性能差） */
+        private boolean toolsEnabled = true;
     }
 }

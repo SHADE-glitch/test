@@ -47,7 +47,7 @@ export const answerInterview = (id: number | string, content: string) =>
 
 export interface StreamCallbacks {
   onToken: (token: string) => void
-  onDone: (messageId: number) => void
+  onDone: (result: { messageId: number; finished: boolean }) => void
 }
 
 export async function streamAnswer(
@@ -87,7 +87,8 @@ export async function streamAnswer(
       if (!data) continue
       if (data.startsWith('{')) {
         try {
-          onDone(JSON.parse(data).messageId as number)
+          const parsed = JSON.parse(data) as { messageId?: number; finished?: boolean }
+          onDone({ messageId: parsed.messageId ?? 0, finished: parsed.finished ?? false })
           finished = true
           break
         } catch {

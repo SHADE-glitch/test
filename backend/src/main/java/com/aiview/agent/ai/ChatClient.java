@@ -17,4 +17,13 @@ public interface ChatClient {
             onToken.accept(resp.content());
         }
     }
+
+    default void chatStreamTools(ChatRequest request, Consumer<String> onToken,
+                                 Consumer<List<ToolCall>> onToolCalls) {
+        ChatResponse resp = chat(request);
+        if (resp.content() != null && !resp.content().isBlank()) {
+            onToken.accept(resp.content());
+        }
+        onToolCalls.accept(resp.toolCalls() == null ? List.of() : resp.toolCalls());
+    }
 }
