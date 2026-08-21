@@ -59,6 +59,7 @@ public class InterviewService {
     private final InterviewStateStore stateStore;
     private final ObjectMapper objectMapper;
     private final RabbitTemplate rabbitTemplate;
+    private final com.aiview.rag.service.RagService ragService;
 
     private static final long LOCK_WAIT_SECONDS = 5;
 
@@ -97,7 +98,8 @@ public class InterviewService {
             stateStore.write(session.getId(), new InterviewStateStore.SessionState(
                     InterviewStatus.START.name(), 0, null));
 
-            List<ChatMessage> messages = decisionMessages(session, List.of());
+            List<ChatMessage> messages = decisionMessages(session, List.of(),
+                    retrieveRagContext(userId, req.getTopic()));
             AiDecision d = runDecision(messages, false, null);
 
             if (d.finished()) {
@@ -128,7 +130,8 @@ public class InterviewService {
 
             saveUserMessage(sessionId, "answer", answer);
 
-            List<ChatMessage> messages = decisionMessages(session, buildHistory(sessionId));
+            List<ChatMessage> messages = decisionMessages(session, buildHistory(sessionId),
+                    retrieveRagContext(userId, answer));
             AiDecision d = runDecision(messages, false, null);
 
             if (d.finished()) {
@@ -163,7 +166,8 @@ public class InterviewService {
 
                 saveUserMessage(sessionId, "answer", answer);
 
-                List<ChatMessage> messages = decisionMessages(session, buildHistory(sessionId));
+                List<ChatMessage> messages = decisionMessages(session, buildHistory(sessionId),
+                    retrieveRagContext(userId, answer));
                 boolean forceFinish = state.questionCount() >= MAX_QUESTIONS;
                 Consumer<String> onToken = token -> {
                     try {
@@ -247,11 +251,25 @@ public class InterviewService {
         }
     }
 
-    private List<ChatMessage> decisionMessages(InterviewSession session, List<ChatMessage> history) {
+    private List<ChatMessage> decisionMessages(InterviewSession session, List<ChatMessage> history, String ragContext) {
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(ChatMessage.system(buildSystemPrompt(session.getTopic(), session.getLevel())));
+        if (ragContext != null && !ragContext.isBlank()) {
+            messages.add(ChatMessage.system(ragContext));
+            log.info("面试 {} 注入 RAG 上下文，长度 {}", session.getId(), ragContext.length());
+        }
         messages.addAll(history);
         return messages;
+    }
+
+    /** 从候选人的知识库检索增强上下文（无命中返回空串） */
+    private String retrieveRagContext(Long userId, String query) {
+        try {
+            return ragService.retrieveContext(userId, query, 2);
+        } catch (Exception e) {
+            log.warn("RAG 检索失败: {}", e.getMessage());
+            return "";
+        }
     }
 
     private ChatRequest decisionRequest(List<ChatMessage> messages) {
